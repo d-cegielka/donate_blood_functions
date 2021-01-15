@@ -1,9 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     match /{document=**} {
-      allow read, write: if
-          request.time < timestamp.date(2020, 12, 16);
+      allow read,write: if false
+    }
+
+  	function isSignedIn() {
+        return request.auth.uid != null
+    }
+
+    function isNurse() {
+    	return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isNurse
+    }
+
+    function checkDonateAccess(rsc) {
+    	return rsc.data.userId == /databases/$(database)/documents/users/$(request.auth.uid)
+    }
+
+    match /users/{user} {
+    	allow read: if isNurse()
+      allow read, write: if isSignedIn() && request.auth.uid == resource.id
+    }
+
+    match /events/{event} {
+    	allow read: if isSignedIn()
+      allow write: if isSignedIn() && isNurse()
+    }
+
+    match /donations/{donation} {
+    	allow read: if (isSignedIn() && checkDonateAccess(resource))
+      allow read,write: if isSignedIn() && isNurse()
     }
   }
 }
